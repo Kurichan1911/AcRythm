@@ -32,3 +32,5 @@
 *.anim merge=unityyamlmerge eol=lf
 *.controller merge=unityyamlmerge eol=lf
 *.cs text eol=lf
+# Default: let Git normalize text files
+* text=auto eol=lf
