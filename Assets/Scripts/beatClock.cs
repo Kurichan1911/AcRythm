@@ -55,7 +55,7 @@ public class beatClock : MonoBehaviour
 
     void Update()
     {
-        Debug.Log(currentBeat);
+        //Debug.Log(currentBeat);
         if (!isPlaying) return;
 
         int beat = (int)Math.Floor(currentBeat);
