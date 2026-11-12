@@ -12,6 +12,7 @@ public class playerMove : MonoBehaviour
 
     private CharacterController controller;
     private float verticalVelocity;
+    public float speedMultipilir { get; set; } = 1f;
 
     private void Awake()
     {
@@ -46,7 +47,7 @@ public class playerMove : MonoBehaviour
             verticalVelocity = -2f;
         verticalVelocity += gravity * Time.deltaTime;
 
-        Vector3 velocity = moveDir * moveSpeed + Vector3.up * verticalVelocity;
+        Vector3 velocity = moveDir * moveSpeed * speedMultipilir + Vector3.up * verticalVelocity;
         controller.Move(velocity * Time.deltaTime);
     }
 
