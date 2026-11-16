@@ -17,8 +17,8 @@ public class followCamera : MonoBehaviour
     void Start()
     {
         yaw = target.eulerAngles.y;
-        Cursor.lockState = CursorLockMode.Locked; //hide cursor.
-        Cursor.visible = false; //lock cursor.
+        Cursor.lockState = CursorLockMode.Locked; //lock cursor.
+        Cursor.visible = false; //hide cursor.
     }
 
     private void LateUpdate()
@@ -33,7 +33,7 @@ public class followCamera : MonoBehaviour
         if (Mouse.current != null)
             look += Mouse.current.delta.ReadValue() * mouseSensitivity;
         if (Gamepad.current != null)
-            look += Gamepad.current.rightStick.ReadValue() * mouseSensitivity;
+            look += Gamepad.current.rightStick.ReadValue() * stickSensitivity * Time.deltaTime;
 
         yaw += look.x;
         pitch = Mathf.Clamp(pitch - look.y, minPitch, maxPitch);
