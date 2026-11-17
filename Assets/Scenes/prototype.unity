@@ -357,6 +357,14 @@ MonoBehaviour:
   clock: {fileID: 1617131170}
   player: {fileID: 2111874065}
   view: {fileID: 123549725}
+  maxHp: 100
+  staggerBeats: 4
+  idleColor: {r: 1, g: 1, b: 1, a: 1}
+  windupColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  attackColor: {r: 1, g: 0, b: 0, a: 1}
+  staggerColor: {r: 0, g: 1, b: 0, a: 1}
+  hitColor: {r: 1, g: 0, b: 1, a: 1}
+  downColor: {r: 0, g: 0, b: 0, a: 1}
 --- !u!65 &123549724
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -700,7 +708,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::beatClock
   audioSource: {fileID: 1617131171}
   bpm: 120
-  firstBeatOffset: 0.5
+  firstBeatOffset: 0.75
   startDelay: 0
   playOnStart: 1
 --- !u!82 &1617131171
@@ -714,7 +722,7 @@ AudioSource:
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 0}
-  m_Resource: {fileID: 8300000, guid: 40207afed3993e4479947e02b7def67d, type: 3}
+  m_Resource: {fileID: 8300000, guid: 60e99db2d1177ac40ba03235411ec2af, type: 3}
   m_PlayOnAwake: 1
   m_Volume: 1
   m_Pitch: 1
@@ -1016,12 +1024,44 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::playerCombat
   clock: {fileID: 1617131170}
-  playerMove: {fileID: 2111874062}
+  playerMoveScript: {fileID: 2111874062}
   bodyRenderer: {fileID: 58597475}
+  attackRange: 2
+  attackDamage: 1
   attackBeats: 1
   justMs: 40
   goodMs: 90
-  parryWindow: 0.1
+  falloffMs: 200
+  damageCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 2
+      inSlope: 0
+      outSlope: -1.5
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0.5
+      inSlope: -1.5
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  target: {fileID: 123549723}
+  riposteRange: 3
+  riposteBeats: 1
+  riposteDamage: 2
+  parryWindow: 0.06
+  parryLate: 0.04
   parryRecovery: 0.4
   guardSpeedMultiplier: 0.4
 --- !u!1 &2123436008

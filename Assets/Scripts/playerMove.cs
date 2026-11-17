@@ -1,4 +1,3 @@
-using System.ComponentModel.Design.Serialization;
 using UnityEngine.InputSystem;
 using UnityEngine;
 
@@ -7,12 +6,12 @@ public class playerMove : MonoBehaviour
 {
     [SerializeField] private Transform cameraTransform;
     [SerializeField] private float moveSpeed = 5f;
-    [SerializeField] private float turnSpeed = 7f;
+    [SerializeField] private float turnSpeed = 720f;
     [SerializeField] private float gravity = -20f;
 
     private CharacterController controller;
     private float verticalVelocity;
-    public float speedMultipilir { get; set; } = 1f;
+    public float speedMultiplier { get; set; } = 1f;
 
     private void Awake()
     {
@@ -47,7 +46,7 @@ public class playerMove : MonoBehaviour
             verticalVelocity = -2f;
         verticalVelocity += gravity * Time.deltaTime;
 
-        Vector3 velocity = moveDir * moveSpeed * speedMultipilir + Vector3.up * verticalVelocity;
+        Vector3 velocity = moveDir * moveSpeed * speedMultiplier + Vector3.up * verticalVelocity;
         controller.Move(velocity * Time.deltaTime);
     }
 
