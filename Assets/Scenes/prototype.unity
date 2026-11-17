@@ -335,6 +335,7 @@ GameObject:
   - component: {fileID: 123549725}
   - component: {fileID: 123549724}
   - component: {fileID: 123549723}
+  - component: {fileID: 123549728}
   m_Layer: 0
   m_Name: dummy
   m_TagString: Untagged
@@ -355,7 +356,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::dummyCombat
   clock: {fileID: 1617131170}
-  player: {fileID: 2111874065}
   view: {fileID: 123549725}
   maxHp: 100
   staggerBeats: 4
@@ -458,6 +458,26 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &123549728
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 123549722}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a56af3b3185bec4f87f5deae05c4c54, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::enemyAttacker
+  clock: {fileID: 1617131170}
+  player: {fileID: 2111874065}
+  enemy: {fileID: 123549723}
+  patterns:
+  - {fileID: 11400000, guid: 1e4cfe17c6434c04a8a363a34e45a4e1, type: 2}
+  - {fileID: 11400000, guid: 097013a142b11de458f1902e074fd6da, type: 2}
+  gridBeats: 4
+  attackFlashSeconds: 0.1
 --- !u!1 &212956203
 GameObject:
   m_ObjectHideFlags: 0
@@ -1027,7 +1047,7 @@ MonoBehaviour:
   playerMoveScript: {fileID: 2111874062}
   bodyRenderer: {fileID: 58597475}
   attackRange: 2
-  attackDamage: 1
+  attackDamage: 10
   attackBeats: 1
   justMs: 40
   goodMs: 90
@@ -1059,7 +1079,7 @@ MonoBehaviour:
   target: {fileID: 123549723}
   riposteRange: 3
   riposteBeats: 1
-  riposteDamage: 2
+  riposteDamage: 30
   parryWindow: 0.06
   parryLate: 0.04
   parryRecovery: 0.4
