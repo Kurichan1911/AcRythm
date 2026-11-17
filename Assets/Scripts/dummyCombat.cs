@@ -1,15 +1,12 @@
-using JetBrains.Annotations;
-using System.Data;
 using UnityEngine;
 
 public class dummyCombat : MonoBehaviour
 {
     [SerializeField] private beatClock clock;
-    [SerializeField] private playerCombat player;
     [SerializeField] private Renderer view;
 
     [Header("ステータス")]
-    [SerializeField] private float maxHp = 3f;
+    [SerializeField] private float maxHp = 100f;
     [SerializeField] private double staggerBeats = 2.0;
 
     [Header("色")]
@@ -20,79 +17,36 @@ public class dummyCombat : MonoBehaviour
     [SerializeField] private Color hitColor = Color.magenta;
     [SerializeField] private Color downColor = Color.black;
 
-    public bool isStaggered { get; private set; }
+    public double staggerEndDsp { get; private set; } = double.NegativeInfinity;
+    public bool isStaggered => AudioSettings.dspTime < staggerEndDsp; //時刻で判定
+    public bool isDown { get; private set; }
 
-    private double impactDsp = -1;
-    private bool attackShown;
-    private double staggerEndDsp = double.NegativeInfinity;
     private float hp;
+    private bool staggerShown; //崩れの色を出している間だけtrue
 
     private void Start()
     {
         hp = maxHp;
     }
 
-    private void OnEnable()
+    private void Update()
     {
-        clock.OnBeat += HandleBeat;
-    }
-    private void OnDisable()
-    {
-        clock.OnBeat -= HandleBeat;
-    }
-
-    private void HandleBeat(int beat)
-    {
-        double beatDsp = clock.BeatToDspTime(beat);
-        if (beatDsp < staggerEndDsp - 0.001) return;
-
-        if(beat % 4 == 2)
+        if(staggerShown && !isStaggered)
         {
-            impactDsp = clock.BeatToDspTime(beat + 1);
-            attackShown = false;
-            view.material.color = windupColor;
-        }
-        else if(beat % 4 == 0)
-        {
-            view.material.color = idleColor;
+            staggerShown = false;
+            ShowIdle();
         }
     }
 
-    void Update()
-    { 
-        double now = AudioSettings.dspTime;
-        if(isStaggered)
-        {
-            if (now < staggerEndDsp) return;
-            isStaggered = false;
-            if (impactDsp < 0) view.material.color = idleColor;
-            //if(now >= staggerEndDsp)
-            //{
-            //    isStaggered = false;
-            //    view.material.color = idleColor;
-            //}
-            //return;
-        }
-        if (impactDsp < 0) return;
+    //見た目の窓口 後でアニメーションに置き換える
+    public void ShowIdle()      { view.material.color = idleColor;  }
+    public void ShowWindup()    { view.material.color = windupColor; }
+    public void ShowAttack()    { view.material.color = attackColor; }
 
-        if (!attackShown && now >= impactDsp)
-        {
-            view.material.color = attackColor;
-            attackShown = true;
-        }
-
-        if(now >= impactDsp + player.parryLateTolerance)
-        {
-            defenceResult result = player.ReceiveAttack(impactDsp);
-            if (result == defenceResult.Parried) StartStagger(impactDsp);
-            impactDsp = -1;
-        }
-    }
-    
-    private void StartStagger(double fromDsp)
+    public void StartStagger(double fromDsp)
     {
-        isStaggered = true;
         staggerEndDsp = fromDsp + staggerBeats * clock.secPerBeat;
+        staggerShown = true;
         view.material.color = staggerColor;
     }
 
@@ -103,11 +57,11 @@ public class dummyCombat : MonoBehaviour
         CheckDown();
     }
 
-    ///<summary>致命攻撃を受ける</summary>
+    ///<summary>致命攻撃を受ける(当てたら崩れは終わり)</summary>>
     public void TakeRiposte(float damage)
     {
-        isStaggered = false;
         staggerEndDsp = double.NegativeInfinity;
+        staggerShown = false;
         hp -= damage;
         Debug.Log($"Riposte hit! Enemy HP {Mathf.Max(hp, 0)}/{maxHp}");
 
@@ -118,8 +72,10 @@ public class dummyCombat : MonoBehaviour
     private bool CheckDown()
     {
         if (hp > 0) return false;
+        staggerEndDsp = double.NegativeInfinity;
         view.material.color = downColor;
-        Debug.Log("ENEMY DOWN");
+        Debug.Log("ENEMY DOWNED");
+        isDown = true;
         enabled = false;
         return true;
     }
