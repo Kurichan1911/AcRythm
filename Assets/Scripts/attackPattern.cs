@@ -3,31 +3,43 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [Serializable]
-public class attackStep
+public class windupCue
 {
-    public beatTime impact; //着弾の位置(パターン開始からカウント)
-    public beatTime windup; //予備動作の長さ 着弾の前にこの長さ分の予備動作をする(0だと予備動作なし→追撃とかに使う)
+    public beatTime time; //予備動作を出す位置(パターン開始からカウントした位置)
+    //以下に予備動作のアニメーションや音などを追加
 }
 
-[CreateAssetMenu(menuName = "Rhythm/Attack Pattern", fileName = "newAttackPattern")]
+[Serializable]
+public class attackCue
+{
+    public beatTime impact; //着弾の位置　パリィ判定の基準
+    //以下にパリィ不可攻撃やダメージ量追加
+}
+
+[CreateAssetMenu(menuName = "Rythm/Attack Pattern", fileName = "newAttackPattern")]
 public class attackPattern : ScriptableObject
 {
-    public beatTime length; //次のパターンが始まるまでのパターン全体の長さ
-    public List<attackStep> steps = new List<attackStep>();
+    public beatTime length; //パターン全体の長さ　(パターン開始から次のパターンが始まるまで)
+    public List<windupCue> windups = new List<windupCue>();
+    public List<attackCue> attacks = new List<attackCue>();
 
-    private void OnValidate()
+    public void OnValidate()
     {
+        int len = length.ToTicks();
         if (!length.IsValid)
-            Debug.LogWarning($"{name}: length の分割数は 480 を割り切れる数にしてください。", this);
+            Debug.LogWarning($"{name}: lengthの分割数は 480 を割り切れる数にしてください。", this);
 
-        foreach(attackStep s in steps)
-        {
-            if (!s.impact.IsValid || !s.windup.IsValid)
-                Debug.LogWarning($"{name}: 分割数は 480 を割り切れる数にしてください。", this);
-            if (s.windup.ToTicks() > s.impact.ToTicks())
-                Debug.LogWarning($"{name}: 予備動作がパターン開始より前から始まります。予備動作の長さを短くしてください。", this);
-            if (s.impact.ToTicks() > length.ToTicks())
-                Debug.LogWarning($"{name}: 着弾の length より後になっています。", this);
-        }
+        foreach (windupCue w in windups)
+            CheckTime(w.time, len, "予備動作");
+        foreach (attackCue a in attacks)
+            CheckTime(a.impact, len, "攻撃");
+    }
+
+    private void CheckTime(beatTime t, int lengthTicks, string label)
+    {
+        if (!t.IsValid)
+            Debug.LogWarning($"{name}: {label}の分割数は 480 を割り切れる数にしてください。", this);
+        if (t.ToTicks() < 0 || t.ToTicks() > lengthTicks)
+            Debug.LogWarning($"{name}: {label}の位置がパターンの範囲(0 ~ length)の外です。", this);
     }
 }
