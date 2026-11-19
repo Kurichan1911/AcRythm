@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using UnityEditorInternal;
 using UnityEngine;
+using UnityEngine.UIElements;
 
-[DefaultExecutionOrder(10)] //dummyConbatよりも後に動かす
+[DefaultExecutionOrder(10)] //色の上書き順をそろえるため、dummyCombatより後に動かす
 public class enemyAttacker : MonoBehaviour
 {
     [SerializeField] private beatClock clock;
@@ -11,26 +13,34 @@ public class enemyAttacker : MonoBehaviour
 
     [Header("パターン")]
     [SerializeField] private List<attackPattern> patterns = new List<attackPattern>(); //順番に繰り返す
-    [SerializeField] private int gridBeats = 4; //開始・復帰を数える秒数
-    [SerializeField] private float attackFlashSeconds = 0.1f; //着弾の色を見せる長さ
+    [SerializeField] private int gridBeats = 4; //開始・復帰をそろえる秒数
+    [SerializeField] private float attackFlashSeconds = 0.1f;
 
-    //パターン内の1回の攻撃の実行状態
-    private class stepRuntime
+    //予備動作1つ当たりの実行状態
+    private class windupRuntime
     {
-        public double windupDsp;
+        public double dsp;
+        public bool shown;
+    }
+
+    //攻撃一つ当たりの実行状態
+    private class attackRuntime
+    {
         public double impactDsp;
-        public bool windupShown;
         public bool impactShown;
         public bool done;
     }
 
-    private readonly List<stepRuntime> active = new List<stepRuntime>();
+    private readonly List<windupRuntime> activeWindups = new List<windupRuntime>();
+    private readonly List<attackRuntime> activeAttacks = new List<attackRuntime>();
     private int patternIndex;
     private bool patternRunning;
     private double patternEndBeat;
-    private double nextStartBeat = double.NaN; //NaN=まだ決めてない
+    private double nextStartBeat = double.NaN; //NaN = まだ決めてない
     private bool wasStaggered;
     private double flashEndDsp = -1;
+    private double lastWindupShownDsp = -1; //最後に予備動作を出した時刻
+    private double lastImpactShownDsp = -1; //最後に攻撃を出した時刻
 
     private void Update()
     {
@@ -40,18 +50,18 @@ public class enemyAttacker : MonoBehaviour
         if (double.IsNaN(nextStartBeat))
             nextStartBeat = NextGrid(Math.Max(clock.currentBeat, 0));
 
-        //崩れが終わったら、次の小節の頭から再開
+        //崩れが終わったら次の小節から再開
         bool staggered = enemy.isStaggered;
         if(wasStaggered && !staggered)
         {
-            //崩れの時間切れなら崩れの終了時刻から 致命攻撃で終わったなら現在時刻から数える
+            //時間切れなら崩れの終了時刻から 致命攻撃で終わったなら今から数える
             double endBeat = double.IsNegativeInfinity(enemy.staggerEndDsp)
                 ? clock.currentBeat
                 : BeatOf(enemy.staggerEndDsp);
             nextStartBeat = NextGrid(endBeat);
         }
         wasStaggered = staggered;
-        if (staggered) return; //崩れている間は予備動作や攻撃はしない
+        if (staggered) return;
 
         //パターンの開始
         if (!patternRunning && now >= clock.BeatToDspTime(nextStartBeat))
@@ -59,10 +69,10 @@ public class enemyAttacker : MonoBehaviour
 
         if (!patternRunning) return;
 
-        ProcessSteps(now);
+        ProcessEvents(now);
 
         //パターンの終了
-        if(patternRunning && now >= clock.BeatToDspTime(patternEndBeat) && AllDone())
+        if (patternRunning && now >= clock.BeatToDspTime(patternEndBeat) && AllDone())
         {
             patternRunning = false;
             nextStartBeat = patternEndBeat;
@@ -73,55 +83,60 @@ public class enemyAttacker : MonoBehaviour
     private void StartPattern(double startBeat)
     {
         attackPattern p = patterns[patternIndex];
-        if (p == null)
+        if(p == null)
         {
             patternIndex = (patternIndex + 1) % patterns.Count; //空のスロットは飛ばす
             return;
         }
 
-        active.Clear();
-        foreach(attackStep s in p.steps)
+        activeWindups.Clear();
+        foreach(windupCue w in p.windups)
         {
-            double impactBeat = startBeat + s.impact.ToBeats();
-            double windupBeat = Math.Max(impactBeat - s.windup.ToBeats(), startBeat);
-            active.Add(new stepRuntime
-            {
-                windupDsp = clock.BeatToDspTime(windupBeat),
-                impactDsp = clock.BeatToDspTime(impactBeat)
-            });
+            activeWindups.Add(new windupRuntime { dsp = clock.BeatToDspTime(startBeat + w.time.ToBeats()) });
+        }
+
+        activeAttacks.Clear();
+        foreach(attackCue a in p.attacks)
+        {
+            activeAttacks.Add(new attackRuntime { impactDsp = clock.BeatToDspTime(startBeat + a.impact.ToBeats()) });
         }
 
         patternEndBeat = startBeat + p.length.ToBeats();
         patternRunning = true;
     }
 
-    private void ProcessSteps(double now)
+    private void ProcessEvents(double now)
     {
-        foreach(stepRuntime s in active)
+        //予備動作
+        foreach(windupRuntime w in activeWindups)
         {
-            if (s.done) continue;
+            if (w.shown || now < w.dsp) continue;
+            w.shown = true;
+            lastWindupShownDsp = now;
+            enemy.ShowWindup();
+        }
 
-            if(!s.windupShown && now >= s.windupDsp)
-            {
-                enemy.ShowWindup();
-                s.windupShown = true;
-            }
+        //攻撃
+        foreach(attackRuntime a in activeAttacks)
+        {
+            if (a.done) continue;
 
-            if(!s.impactShown && now >= s.impactDsp)
+            if(!a.impactShown && now >= a.impactDsp)
             {
-                enemy.ShowAttack();
-                s.impactShown = true;
+                a.impactShown = true;
+                lastImpactShownDsp = now;
                 flashEndDsp = now + attackFlashSeconds;
+                enemy.ShowAttack();
             }
 
-            //着弾・遅押しの猶予が来たら判定を呼ぶ
-            if(now >= s.impactDsp + player.parryLateTolerance)
+            //着弾+遅押しの猶予が過ぎたら判定
+            if (now >= a.impactDsp + player.parryLateTolerance)
             {
-                s.done = true;
-                defenceResult result = player.ReceiveAttack(s.impactDsp);
+                a.done = true;
+                defenceResult result = player.ReceiveAttack(a.impactDsp);
                 if(result == defenceResult.Parried)
                 {
-                    enemy.StartStagger(s.impactDsp);
+                    enemy.StartStagger(a.impactDsp);
                     InterruptPattern();
                     wasStaggered = true;
                     return;
@@ -129,18 +144,19 @@ public class enemyAttacker : MonoBehaviour
             }
         }
 
-        //着弾の色を戻す(予備動作中なら戻さない)
+        //着弾の色を戻す
         if(flashEndDsp >= 0 && now >= flashEndDsp)
         {
             flashEndDsp = -1;
-            if (!AnyWindupActive(now)) enemy.ShowIdle();
+            if (lastWindupShownDsp <= lastImpactShownDsp) enemy.ShowIdle();
         }
     }
 
-    //パリィされたら、残りの攻撃をすべてキャンセルして次のパターンへ
+    //パリィされたら残りの予備動作と攻撃をすべてキャンセルして次のパターンへ
     private void InterruptPattern()
     {
-        foreach (stepRuntime s in active) s.done = true;
+        foreach (attackRuntime a in activeAttacks) a.done = true;
+        foreach (windupRuntime w in activeWindups) w.shown = true;
         patternRunning = false;
         patternIndex = (patternIndex + 1) % patterns.Count;
         flashEndDsp = -1;
@@ -148,16 +164,11 @@ public class enemyAttacker : MonoBehaviour
 
     private bool AllDone()
     {
-        foreach (stepRuntime s in active)
-            if (!s.done) return false;
+        foreach (attackRuntime a in activeAttacks)
+            if (!a.done) return false;
+        foreach (windupRuntime w in activeWindups)
+            if (!w.shown) return false;
         return true;
-    }
-
-    private bool AnyWindupActive(double now)
-    {
-        foreach (stepRuntime s in active)
-            if (!s.done && s.windupShown && now < s.impactDsp) return true;
-        return false;
     }
 
     private double BeatOf(double dsp)
@@ -165,9 +176,10 @@ public class enemyAttacker : MonoBehaviour
         return (dsp - clock.BeatToDspTime(0)) / clock.secPerBeat;
     }
 
+    //指定の拍以降で、最初の gridBeats の倍数の拍
     private double NextGrid(double beat)
     {
         int grid = Mathf.Max(1, gridBeats);
-        return Math.Ceiling(beat / grid - 1e-6) * grid; //ちょうど倍数ならその数を返す
+        return Math.Ceiling(beat / grid - 1e-6) * grid; //ちょうど倍数なら、その拍を返す
     }
 }
