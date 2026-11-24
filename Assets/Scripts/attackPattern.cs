@@ -14,9 +14,10 @@ public class attackCue
 {
     public beatTime impact; //着弾の位置　パリィ判定の基準
     //以下にパリィ不可攻撃やダメージ量追加
+    public float damage = 10f;
 }
 
-[CreateAssetMenu(menuName = "Rythm/Attack Pattern", fileName = "newAttackPattern")]
+[CreateAssetMenu(menuName = "Rhythm/Attack Pattern", fileName = "newAttackPattern")]
 public class attackPattern : ScriptableObject
 {
     public beatTime length; //パターン全体の長さ　(パターン開始から次のパターンが始まるまで)
