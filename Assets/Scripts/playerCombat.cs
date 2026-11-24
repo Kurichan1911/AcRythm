@@ -1,7 +1,5 @@
 using UnityEngine;
 using System;
-using UnityEngine.InputSystem;
-using System.ComponentModel.Design.Serialization;
 
 public enum playerAction { Free, Attack, Guard, Parry, Recovery, Riposte, Down }
 public enum defenceResult { Hit, Guarded, Parried }
@@ -49,15 +47,8 @@ public class playerCombat : MonoBehaviour
     private double parryEndDsp; //パリィ判定終了dspTime
 
     //------入力------
-    private bool attackPressed =>
-        (Mouse.current?.leftButton.wasPressedThisFrame ?? false) ||
-        (Gamepad.current?.rightShoulder.wasPressedThisFrame ?? false);
-    private bool parryPressed =>
-        (Keyboard.current?.fKey.wasPressedThisFrame ?? false) ||
-        (Gamepad.current?.leftTrigger.wasPressedThisFrame ?? false);
-    private bool GuardHeld =>
-        (Mouse.current?.rightButton.isPressed ?? false) ||
-        (Gamepad.current?.leftShoulder.isPressed ?? false);
+    [Header("入力")]
+    [SerializeField] private playerInput input;
 
     void Start()
     {
@@ -69,19 +60,22 @@ public class playerCombat : MonoBehaviour
         double now = AudioSettings.dspTime;
         if (action == playerAction.Down) return; //倒れたら何もできない
 
-        switch(action)
+        bool attackPressed = input.attack.pressed;
+        bool parryPressed = input.parry.pressed;
+        bool guardHeld = input.guard.held;
+
+        switch (action)
         {
             case playerAction.Free:
             case playerAction.Guard:
                 if (parryPressed) StartParry(now);
-                //else if (attackPressed) StartAttack(now);
                 else if (attackPressed)
                 {
                     enemyBase riposteTarget = FindTarget(riposteRange, true);
                     if (riposteTarget != null) StartRiposte(now, riposteTarget);
                     else StartAttack(now);
                 }
-                else SetAction(GuardHeld ? playerAction.Guard : playerAction.Free);
+                else SetAction(guardHeld ? playerAction.Guard : playerAction.Free);
                 break;
 
             case playerAction.Attack:
