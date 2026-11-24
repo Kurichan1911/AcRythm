@@ -1,19 +1,17 @@
 using System;
 using System.Collections.Generic;
-using UnityEditorInternal;
 using UnityEngine;
-using UnityEngine.UIElements;
 
 [DefaultExecutionOrder(10)] //色の上書き順をそろえるため、dummyCombatより後に動かす
 public class enemyAttacker : MonoBehaviour
 {
     [SerializeField] private beatClock clock;
     [SerializeField] private playerCombat player;
-    [SerializeField] private dummyCombat enemy;
+    [SerializeField] private enemyBase enemy;
 
     [Header("パターン")]
     [SerializeField] private List<attackPattern> patterns = new List<attackPattern>(); //順番に繰り返す
-    [SerializeField] private int gridBeats = 4; //開始・復帰をそろえる秒数
+    [SerializeField] private int gridBeats = 4; //開始・復帰をそろえる拍数
     [SerializeField] private float attackFlashSeconds = 0.1f;
 
     //予備動作1つ当たりの実行状態
@@ -27,6 +25,7 @@ public class enemyAttacker : MonoBehaviour
     private class attackRuntime
     {
         public double impactDsp;
+        public float damage;
         public bool impactShown;
         public bool done;
     }
@@ -98,7 +97,11 @@ public class enemyAttacker : MonoBehaviour
         activeAttacks.Clear();
         foreach(attackCue a in p.attacks)
         {
-            activeAttacks.Add(new attackRuntime { impactDsp = clock.BeatToDspTime(startBeat + a.impact.ToBeats()) });
+            activeAttacks.Add(new attackRuntime
+            {
+                impactDsp = clock.BeatToDspTime(startBeat + a.impact.ToBeats()),
+                damage = a.damage
+            });
         }
 
         patternEndBeat = startBeat + p.length.ToBeats();
@@ -133,7 +136,7 @@ public class enemyAttacker : MonoBehaviour
             if (now >= a.impactDsp + player.parryLateTolerance)
             {
                 a.done = true;
-                defenceResult result = player.ReceiveAttack(a.impactDsp);
+                defenceResult result = player.ReceiveAttack(a.impactDsp, a.damage);
                 if(result == defenceResult.Parried)
                 {
                     enemy.StartStagger(a.impactDsp);
