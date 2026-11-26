@@ -34,6 +34,7 @@ public class weaponData : ScriptableObject
     [Range(0f, 1f)] public float pressWeight = 0.5f;    //ホールド判定の押す側の重み(離す側はholdLengthから自動計算)
     public bool allowStepDoubling = true;               //高BPMで最短入力間隔を下回ったら2倍の長さで判定するかどうか
     public float minIntervalMs = 150f;                  //最短入力間隔の目安(ms)
+    [Min(0.1f)] public float timingWindowMul = 1.0f;    //タイミング判定の許容幅倍率(1.0が標準で、小さいほど厳しく大きいほど緩い)
 
     [Header("カウンター(調整前)")]
     public counterTrigger counterType = counterTrigger.None;
