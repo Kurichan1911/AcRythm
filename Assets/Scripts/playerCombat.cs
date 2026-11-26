@@ -137,8 +137,7 @@ public class playerCombat : MonoBehaviour
     private void StartAttack(double now)
     {
         double durationBeats = currentWeapon != null ? currentWeapon.GetEffectiveBeats(currentWeapon.attackDuration, clock.secPerBeat) : attackBeats;
-        stateEndDsp = now + durationBeats * clock.secPerBeat;
-        SetAction(playerAction.Attack);
+        SetAttackState(now, durationBeats);
 
         //ビートに合わせて最寄り拍とのズレを計算する(+=遅, -=早)
         double stepBeats = currentWeapon != null ? currentWeapon.GetEffectiveBeats(currentWeapon.rhythmStep, clock.secPerBeat) : 1.0;
@@ -162,7 +161,7 @@ public class playerCombat : MonoBehaviour
         float damage = attackDamage * weaponMul * mul;
 
         string name = currentWeapon != null ? currentWeapon.weaponName : "なし";
-        Debug.Log($"TapAttack [{name}] {rating}({offsetMs:+0:-0}ms) x{mul:0.00} = {damage:0.0}");
+        Debug.Log($"TapAttack [{name}] {rating}({offsetMs:+0;-0}ms) x{mul:0.00} = {damage:0.0}");
 
         ApplyAttackHit(damage);
     }
