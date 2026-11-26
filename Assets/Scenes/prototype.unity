@@ -147,8 +147,8 @@ Transform:
   m_GameObject: {fileID: 58597473}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalPosition: {x: 0, y: 0.5, z: 0}
+  m_LocalScale: {x: 1, y: 1.5, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1290486810}
@@ -649,7 +649,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0.5, z: 0.5}
-  m_LocalScale: {x: 0.3, y: 0.3, z: 0.5}
+  m_LocalScale: {x: 0.3, y: 0.23, z: 0.5}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 58597474}
@@ -743,7 +743,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::beatClock
   audioSource: {fileID: 1617131171}
   bpm: 120
-  firstBeatOffset: 0.5
+  firstBeatOffset: 0.25
   startDelay: 0
   playOnStart: 1
 --- !u!82 &1617131171
@@ -1235,7 +1235,7 @@ MonoBehaviour:
   clock: {fileID: 1617131170}
   playerMoveScript: {fileID: 2111874062}
   bodyRenderer: {fileID: 58597475}
-  currentWeapon: {fileID: 11400000, guid: 566fb32ba1f589743b303d740911fff7, type: 2}
+  currentWeapon: {fileID: 11400000, guid: 530a91ad91ce6b14195d286344802a53, type: 2}
   attackRange: 2
   attackDamage: 5
   attackBeats: 1
@@ -1246,8 +1246,8 @@ MonoBehaviour:
     serializedVersion: 2
     m_Curve:
     - serializedVersion: 3
-      time: 0
-      value: 2
+      time: -0.00031661987
+      value: 1.4997101
       inSlope: 0
       outSlope: 0
       tangentMode: 0
@@ -1255,8 +1255,8 @@ MonoBehaviour:
       inWeight: 0
       outWeight: 0
     - serializedVersion: 3
-      time: 0.21383277
-      value: 1.4303191
+      time: 0.29607764
+      value: 1.1919158
       inSlope: -3.1727006
       outSlope: -3.1727006
       tangentMode: 0
@@ -1264,8 +1264,8 @@ MonoBehaviour:
       inWeight: 0.33333334
       outWeight: 0.073018685
     - serializedVersion: 3
-      time: 0.78140134
-      value: 0.903419
+      time: 0.7937915
+      value: 0.7682872
       inSlope: -0.50781596
       outSlope: -0.50781596
       tangentMode: 0

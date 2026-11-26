@@ -2,7 +2,7 @@ using UnityEngine;
 using System;
 
 public enum playerAction { Free, Holding, SubCharging, Attack, Guard, Parry, Recovery, Riposte, Down }
-public enum defenceResult { Hit, Guarded, Parried }
+public enum defenceResult { Hit, Guarded, Parried, Countered }
 
 public class playerCombat : MonoBehaviour
 {
@@ -38,7 +38,16 @@ public class playerCombat : MonoBehaviour
     [SerializeField] private double parryLate = 0.06; //着弾より遅く入力した場合の猶予(秒)
     [SerializeField] private double parryRecovery = 0.4; //判定後の硬直(秒)
 
-    public double parryLateTolerance => parryLate; //敵が「着弾の何秒後に判定を呼ぶか」を知るため
+    public double parryLateTolerance //敵が「着弾の何秒後に判定を呼ぶか」を知るため
+    {
+        get
+        {
+            double counterLate = (currentWeapon != null && currentWeapon.counterType != counterTrigger.None)
+                ? currentWeapon.counterLateMs * 0.001
+                : 0.0;
+            return Math.Max(parryLate, counterLate);
+        }
+    }
 
     [Header("防御")]
     [SerializeField] private float guardSpeedMultiplier = 0.4f;
@@ -58,6 +67,14 @@ public class playerCombat : MonoBehaviour
     private float holdPressMul;
     private double chainReadyDsp; //次の攻撃・パリィを先行受付できるdspTime
     private double lastTapTargetBeat = double.NegativeInfinity; //直前のタップ攻撃で判定した拍 二重打ち防止用
+    private double counterPressDsp = double.NegativeInfinity; //ホールド開始時刻 押しカウンター判定用
+    private bool holdIsCounter; //押しカウンターが成立しているか判定用
+    private bool pendingReleaseCounter; //離しカウンターの着弾待ち中か
+    private double counterReleaseDsp = double.NegativeInfinity;　//ホールド終了時刻 離しカウンター判定用
+    private double pendingReleaseResolveDsp; //この時刻まで着弾が無ければ通常攻撃とする
+    private float pendingReleaseBaseDmg; //居合の基本ダメージ記憶
+    private string pendingReleaseLogInfo; //通常確定時のログ文字列
+    private bool attackIsCounter; //現在のAttack動作がカウンターか
 
     //------入力------
     [Header("入力")]
@@ -126,8 +143,29 @@ public class playerCombat : MonoBehaviour
         }
     }
 
+    private void LateUpdate()
+    {
+        if (!pendingReleaseCounter) return;
+        if (action == playerAction.Down)
+        {
+            pendingReleaseCounter = false;
+            return;
+        }
+        if (AudioSettings.dspTime >= pendingReleaseResolveDsp)
+            FlushPendingReleaseCounter();
+    }
+
+    private void FlushPendingReleaseCounter()
+    {
+        if (!pendingReleaseCounter) return;
+        pendingReleaseCounter = false;
+        Debug.Log(pendingReleaseLogInfo);
+        ApplyAttackHit(pendingReleaseBaseDmg);
+    }
+
     private void StartAttackOrRiposte(double now)
     {
+        FlushPendingReleaseCounter();
         enemyBase riposteTarget = FindTarget(riposteRange, true);
         if (riposteTarget != null) StartRiposte(now, riposteTarget);
         else if (currentWeapon != null && currentWeapon.inputType == weaponInputType.Hold) StartHold(now);
@@ -166,13 +204,15 @@ public class playerCombat : MonoBehaviour
         ApplyAttackHit(damage);
     }
 
-    private void SetAttackState(double now, double durationBeats)
+    private void SetAttackState(double now, double durationBeats, bool isCounter = false)
     {
         double durationSec = durationBeats * clock.secPerBeat;
-        double earlyChainSec = Math.Min(goodMs * 0.001, durationSec * 0.5);
+        double earlyChainSec = Math.Min(goodMs * GetTimingScale() * 0.001, durationSec * 0.5);
         stateEndDsp = now + durationSec;
         chainReadyDsp = stateEndDsp - earlyChainSec;
-        SetAction(playerAction.Attack);
+        attackIsCounter = isCounter;
+        if (action == playerAction.Attack) ApplyView();
+        else SetAction(playerAction.Attack);
     }
 
     private void StartHold(double now)
@@ -185,6 +225,9 @@ public class playerCombat : MonoBehaviour
         holdPressOffsetMs = (pressBeat - holdTargetPressBeat) * clock.secPerBeat * 1000.0;
         holdPressMul = EvaluateTimingMultiplier(Math.Abs(holdPressOffsetMs));
 
+        counterPressDsp = now;
+        holdIsCounter = false;
+
         SetAction(playerAction.Holding);
     }
 
@@ -192,6 +235,7 @@ public class playerCombat : MonoBehaviour
     {
         if(currentWeapon == null)
         {
+            holdIsCounter = false;
             SetAction(playerAction.Free);
             return;
         }
@@ -202,17 +246,42 @@ public class playerCombat : MonoBehaviour
         double releaseOffsetMs = (releaseBeat - targetReleaseBeat) * clock.secPerBeat * 1000.0;
         float releaseMul = EvaluateTimingMultiplier(Math.Abs(releaseOffsetMs));
 
-        float timingMul = holdPressMul * currentWeapon.pressWeight + releaseMul * currentWeapon.releaseWeight;
-        float damage = attackDamage * currentWeapon.damageMultiplier * timingMul;
+        bool isPressCounter = holdIsCounter;
+        holdIsCounter = false;
 
-        double durationBeats = currentWeapon.GetEffectiveBeats(currentWeapon.attackDuration, clock.secPerBeat);
-        SetAttackState(now, durationBeats);
+        float timingMul = holdPressMul * currentWeapon.pressWeight + releaseMul * currentWeapon.releaseWeight;
+        //float counterMul = isCounter ? currentWeapon.counterDamageMultiplier : 1f;
+        //float damage = attackDamage * currentWeapon.damageMultiplier * timingMul * counterMul;
+        float baseDmg = attackDamage * currentWeapon.damageMultiplier * timingMul;
 
         string pressRating = GetTimingRating(Math.Abs(holdPressOffsetMs));
         string releaseRating = GetTimingRating(Math.Abs(releaseOffsetMs));
-        Debug.Log($"HoldAttack [{currentWeapon.weaponName}] 押:{pressRating}({holdPressOffsetMs:+0;-0}ms) / 離:{releaseRating}({releaseOffsetMs:+0;-0}ms) x{timingMul:0.00} = {damage:0.0}");
+        string timingInfo = $"[{currentWeapon.weaponName}] 押:{pressRating}({holdPressOffsetMs:+0;-0}ms) / 離:{releaseRating}({releaseOffsetMs:+0;-0}ms)";
 
-        ApplyAttackHit(damage);
+        double durationBeats = currentWeapon.GetEffectiveBeats(currentWeapon.attackDuration, clock.secPerBeat);
+
+        //離しカウンター武器は早押し猶予分だけ着弾を待ってから確定する
+        if (currentWeapon.counterType == counterTrigger.OnRelease)
+        {
+            FlushPendingReleaseCounter();
+            SetAttackState(now, durationBeats, false);
+
+            pendingReleaseCounter = true;
+            counterReleaseDsp = now;
+            pendingReleaseResolveDsp = now + currentWeapon.counterEarlyMs * 0.001 + parryLateTolerance;
+            pendingReleaseBaseDmg = baseDmg;
+            pendingReleaseLogInfo = $"HoldAttack {timingInfo} x{timingMul:0.00} = {baseDmg:0.0}";
+            return;
+        }
+
+        float counterMul = isPressCounter ? currentWeapon.counterDamageMultiplier : 1f;
+        float dmg = baseDmg * counterMul;
+        SetAttackState(now, durationBeats, isPressCounter);
+
+        string tag = isPressCounter ? "COUNTER HoldAttack" : "HoldAttack";
+        Debug.Log($"{tag}{timingInfo} x {timingMul * counterMul:0.00} = {dmg:0.0}");
+
+        ApplyAttackHit(dmg);
     }
 
     //攻撃の当たり判定(プロトタイプ中は距離で判定している。将来的には武器モデルのコライダー判定に差し替える)
@@ -222,15 +291,23 @@ public class playerCombat : MonoBehaviour
         if (hitTarget != null) hitTarget.TakeDamage(damage);
     }
 
+    private float GetTimingScale()
+    {
+        if (currentWeapon == null || currentWeapon.timingWindowMul <= 0f) return 1f;
+        return currentWeapon.timingWindowMul;
+    }
+
     private float EvaluateTimingMultiplier(double absOffsetMs)
     {
-        float t = Mathf.Clamp01((float)(absOffsetMs / falloffMs));
+        float effectiveFallOff = falloffMs * GetTimingScale();
+        float t = Mathf.Clamp01((float)(absOffsetMs / effectiveFallOff));
         return damageCurve.Evaluate(t);
     }
 
     private string GetTimingRating(double absOffsetMs)
     {
-        return absOffsetMs <= justMs ? "JUST" : absOffsetMs <= goodMs ? "GOOD" : "OFF";
+        float scale = GetTimingScale();
+        return absOffsetMs <= justMs * scale ? "JUST" : absOffsetMs <= goodMs * scale ? "GOOD" : "OFF";
     }
 
     private double BeatOf(double dsp)
@@ -263,6 +340,7 @@ public class playerCombat : MonoBehaviour
 
     private void StartParry(double now)
     {
+        holdIsCounter = false;
         parryStartDsp = now;
         parryEndDsp = now + parryWindow;
         stateEndDsp = parryEndDsp + parryRecovery;
@@ -315,6 +393,48 @@ public class playerCombat : MonoBehaviour
             return defenceResult.Parried;
         }
 
+        if (action == playerAction.Holding
+            && currentWeapon != null
+            && currentWeapon.counterType == counterTrigger.OnPress)
+        {
+            double diffMs = (counterPressDsp - impactDspTime) * 1000.0;
+            if(diffMs >= -currentWeapon.counterEarlyMs && diffMs <= currentWeapon.counterLateMs)
+            {
+                counterPressDsp = double.NegativeInfinity;
+                holdIsCounter = true;
+                ApplyView();
+                float taken = damage * currentWeapon.counterTakenDamageMultiplier;
+                Debug.Log($"Counter Block [{currentWeapon.weaponName}] ({diffMs:+0;-0}ms) 被ダメ:[{taken:0.0}]");
+                TakeDamage(taken);
+                return defenceResult.Countered;
+            }
+        }
+
+        if (pendingReleaseCounter
+            && currentWeapon != null
+            && currentWeapon.counterType == counterTrigger.OnRelease)
+        {
+            double diffMs = (counterReleaseDsp - impactDspTime) * 1000.0;
+            if (diffMs >= -currentWeapon.counterEarlyMs && diffMs <= currentWeapon.counterLateMs)
+            {
+                pendingReleaseCounter = false;
+                counterReleaseDsp = double.NegativeInfinity;
+
+                float counterDmg = pendingReleaseBaseDmg * currentWeapon.counterDamageMultiplier;
+                float taken = damage * currentWeapon.counterTakenDamageMultiplier;
+
+                attackIsCounter = true;
+                ApplyView();
+
+                Debug.Log($"IAI COUNTER [{currentWeapon.weaponName}] (離しズレ:{diffMs:+0;-0}ms) 被ダメ:[{taken:0.0}] 与ダメ:[{counterDmg:0.0}]");
+                TakeDamage(taken);
+                if (action != playerAction.Down)
+                    ApplyAttackHit(counterDmg);
+
+                return defenceResult.Countered;
+            }
+        }
+
         if(action == playerAction.Guard)
         {
             float taken = damage * guardDamageMultiplier;
@@ -325,7 +445,10 @@ public class playerCombat : MonoBehaviour
 
         //Debug.Log("HIT!!");
         if (action == playerAction.Holding || action == playerAction.SubCharging)
+        {
+            holdIsCounter = false;
             SetAction(playerAction.Free);
+        }
         TakeDamage(damage);
         return defenceResult.Hit;
     }
@@ -352,10 +475,10 @@ public class playerCombat : MonoBehaviour
         switch(action)
         {
             case playerAction.Free:         playerMoveScript.speedMultiplier = 1f; SetColor(Color.white); break;
-            case playerAction.Holding:      playerMoveScript.speedMultiplier = holdSpeedMultiplier; SetColor(new Color(1f, 0.55f, 0f)); break;
             case playerAction.SubCharging:  playerMoveScript.speedMultiplier = subChargeSpeedMultiplier; SetColor(subChargeColor); break;
             case playerAction.Guard:        playerMoveScript.speedMultiplier = guardSpeedMultiplier; SetColor(Color.blue); break;
-            case playerAction.Attack:       playerMoveScript.speedMultiplier = 0f; SetColor(Color.red); break;
+            case playerAction.Attack:       playerMoveScript.speedMultiplier = 0f; SetColor(attackIsCounter ? new Color(0.65f, 0.2f, 1f) : Color.red); break;
+            case playerAction.Holding:      playerMoveScript.speedMultiplier = holdSpeedMultiplier; SetColor(holdIsCounter ? new Color(0.3f, 1f, 0.3f) : new Color(1f, 0.55f, 0f)); break;
             case playerAction.Parry:        playerMoveScript.speedMultiplier = 0f; SetColor(Color.cyan); break;
             case playerAction.Recovery:     playerMoveScript.speedMultiplier = 0f; SetColor(Color.gray); break;
             case playerAction.Riposte:      playerMoveScript.speedMultiplier = 0f; SetColor(Color.magenta); break;
@@ -373,6 +496,10 @@ public class playerCombat : MonoBehaviour
 
         if (action == playerAction.SubCharging)
             GUI.Label(new Rect(10, 80, 450, 40), "* SUB CHARGE 中");
+        else if (action == playerAction.Holding && holdIsCounter)
+            GUI.Label(new Rect(10, 80, 450, 40), "* COUNTER READY");
+        else if (action == playerAction.Attack && attackIsCounter)
+            GUI.Label(new Rect(10, 80, 450, 40), "* COUNTER ATTACK");
     }
 
     private void SetColor(Color c)
